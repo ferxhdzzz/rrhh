@@ -665,7 +665,7 @@
             try {
                 const { data, error } = await supabaseClient
                     .from('usuarios')
-                    .select('id, username, password')
+                   .select('username, password')
                     .ilike('username', usuario)
                     .eq('password', password)
                     .limit(1);
