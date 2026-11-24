@@ -164,6 +164,22 @@
         <!-- Contenido Principal -->
         <main class="max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
 
+            <!-- Alerta de Límite de Incapacidades (2 o más en los últimos 4 meses) -->
+            <section id="banner-alerta-incapacidades" class="hidden rounded-2xl bg-rose-50 border-2 border-rose-300 p-4 shadow-md shadow-rose-500/10">
+                <div class="flex items-start gap-3">
+                    <div class="w-9 h-9 rounded-xl bg-rose-600 text-white flex items-center justify-center shrink-0 mt-0.5">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"/>
+                        </svg>
+                    </div>
+                    <div class="flex-1">
+                        <h3 class="text-sm font-extrabold text-rose-900">Alerta: Límite de incapacidades excedido (últimos 4 meses)</h3>
+                        <p class="text-xs text-rose-700 mt-0.5">Los siguientes empleados acumulan <strong>2 o más incapacidades</strong> dentro de un período de 4 meses:</p>
+                        <ul id="lista-alerta-incapacidades" class="mt-2 space-y-1 text-xs font-semibold text-rose-900"></ul>
+                    </div>
+                </div>
+            </section>
+
             <!-- KPIs -->
             <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 <div class="glass-card rounded-2xl p-5">
@@ -246,6 +262,7 @@
                                 class="w-full px-3.5 py-2.5 rounded-xl border border-purple-200 bg-white text-sm font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-purple-500">
                                 <optgroup label="Permisos">
                                     <option value="Permiso Personal">Permiso Personal</option>
+                                    <option value="Misión oficial">Misión oficial</option>
                                     <option value="Olvido de marcación">Olvido de marcación</option>
                                     <option value="Cumpleaños">Cumpleaños</option>
                                     <option value="Enfermedad personal">Enfermedad personal</option>
@@ -348,6 +365,7 @@
                             <option value="TODOS">Todos los tipos</option>
                             <option value="SOLO_PERMISOS">Todos los permisos</option>
                             <option value="Permiso Personal">Permiso Personal</option>
+                            <option value="Misión oficial">Misión oficial</option>
                             <option value="Olvido de marcación">Olvido de marcación</option>
                             <option value="Cumpleaños">Cumpleaños</option>
                             <option value="Enfermedad personal">Enfermedad personal</option>
@@ -411,6 +429,7 @@
                         class="w-full px-3.5 py-2.5 rounded-xl border border-purple-200 bg-white text-sm font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-purple-500">
                         <optgroup label="Permisos">
                             <option value="Permiso Personal">Permiso Personal</option>
+                            <option value="Misión oficial">Misión oficial</option>
                             <option value="Olvido de marcación">Olvido de marcación</option>
                             <option value="Cumpleaños">Cumpleaños</option>
                             <option value="Enfermedad personal">Enfermedad personal</option>
@@ -536,7 +555,7 @@
                 .replace(/'/g, '&#039;');
         }
 
-        function mostrarToast(mensaje, tipo = 'info') {
+        function mostrarToast(mensaje, tipo = 'info', duracion = 3500) {
             const container = document.getElementById('toast-container');
             if (!container) return;
 
@@ -554,7 +573,7 @@
             setTimeout(() => {
                 toast.style.opacity = '0';
                 setTimeout(() => toast.remove(), 300);
-            }, 3500);
+            }, duracion);
         }
 
         function inicializarClienteSupabase() {
@@ -591,7 +610,125 @@
         }
 
         // =========================================================================
-        // 3. AUTENTICACIÓN Y LOGIN
+        // 3. DETECCIÓN DE LÍMITE DE INCAPACIDADES (2 O MÁS EN ÚLTIMOS 4 MESES)
+        // =========================================================================
+        function obtenerIncapacidadesEnVentana4Meses(empleadoId, fechaReferenciaStr = null) {
+    const incapsEmpleado = registros.filter(r =>
+        Number(r.empleado_id) === Number(empleadoId) && esIncapacidad(r.tipo)
+    );
+
+    if (incapsEmpleado.length < 2) return [];
+
+    // Si se pasa una fecha puntual (al guardar/editar), evaluar los 4 meses terminando en ese mes
+    if (fechaReferenciaStr) {
+        const [anioRef, mesRef] = String(fechaReferenciaStr).split('-').map(Number);
+        const indiceFin = anioRef * 12 + (mesRef - 1);
+        const indiceInicio = indiceFin - 3;
+
+        return incapsEmpleado.filter(r => {
+            const [a, m] = String(r.fecha_inicio).split('-').map(Number);
+            const idx = a * 12 + (m - 1);
+            return idx >= indiceInicio && idx <= indiceFin;
+        });
+    }
+
+    // Evaluación global: buscar cualquier ventana de 4 meses consecutivos con 2 o más incapacidades
+    let mejorGrupo = [];
+    incapsEmpleado.forEach(base => {
+        const [aBase, mBase] = String(base.fecha_inicio).split('-').map(Number);
+        const indiceFin = aBase * 12 + (mBase - 1);
+        const indiceInicio = indiceFin - 3;
+
+        const grupo = incapsEmpleado.filter(r => {
+            const [a, m] = String(r.fecha_inicio).split('-').map(Number);
+            const idx = a * 12 + (m - 1);
+            return idx >= indiceInicio && idx <= indiceFin;
+        });
+
+        if (grupo.length > mejorGrupo.length) {
+            mejorGrupo = grupo;
+        }
+    });
+
+    return mejorGrupo.length >= 2 ? mejorGrupo : [];
+}
+
+function evaluarAlertasIncapacidadesGlobales() {
+    const banner = document.getElementById('banner-alerta-incapacidades');
+    const lista = document.getElementById('lista-alerta-incapacidades');
+    if (!banner || !lista) return;
+
+    const alertas = [];
+
+    empleados.forEach(emp => {
+        const incapsRecientes = obtenerIncapacidadesEnVentana4Meses(emp.id);
+        if (incapsRecientes.length >= 2) {
+            const fechasTexto = incapsRecientes
+                .map(r => formatearFecha(r.fecha_inicio))
+                .join(', ');
+            alertas.push({
+                nombre: emp.nombre,
+                cantidad: incapsRecientes.length,
+                fechas: fechasTexto
+            });
+        }
+    });
+
+    if (alertas.length === 0) {
+        banner.classList.add('hidden');
+        lista.innerHTML = '';
+        return;
+    }
+
+    lista.innerHTML = alertas.map(a => `
+        <li class="flex flex-wrap items-center gap-1.5">
+            <span class="px-2 py-0.5 rounded-md bg-rose-200/80 text-rose-950 font-extrabold">${escaparHTML(a.nombre)}</span>
+            <span>excedió el límite con <strong>${a.cantidad} incapacidades</strong> en un lapso de 4 meses (${a.fechas}).</span>
+        </li>
+    `).join('');
+
+    banner.classList.remove('hidden');
+}
+
+        function evaluarAlertasIncapacidadesGlobales() {
+            const banner = document.getElementById('banner-alerta-incapacidades');
+            const lista = document.getElementById('lista-alerta-incapacidades');
+            if (!banner || !lista) return;
+
+            const alertas = [];
+
+            empleados.forEach(emp => {
+                const incapsRecientes = obtenerIncapacidadesEnVentana4Meses(emp.id);
+                if (incapsRecientes.length >= 2) {
+                    const fechasTexto = incapsRecientes
+                        .map(r => formatearFecha(r.fecha_inicio))
+                        .join(', ');
+                    alertas.push({
+                        nombre: emp.nombre,
+                        cantidad: incapsRecientes.length,
+                        fechas: fechasTexto
+                    });
+                }
+            });
+
+            if (alertas.length === 0) {
+                banner.classList.add('hidden');
+                lista.innerHTML = '';
+                return;
+            }
+
+            lista.innerHTML = alertas.map(a => `
+                <li class="flex flex-wrap items-center gap-1.5">
+                    <span class="px-2 py-0.5 rounded-md bg-rose-200/80 text-rose-950 font-extrabold">${escaparHTML(a.nombre)}</span>
+                    <span>excedió el límite con <strong>${a.cantidad} incapacidades</strong> en los últimos 4 meses (${a.fechas}).</span>
+                </li>
+            `).join('');
+
+            banner.classList.remove('hidden');
+        }
+
+        // =========================================================================
+        // 4. AUTENTICACIÓN Y LOGIN
         // =========================================================================
         function mostrarErrorLogin(mensaje) {
             const box = document.getElementById('login-error');
@@ -665,7 +802,7 @@
             try {
                 const { data, error } = await supabaseClient
                     .from('usuarios')
-                   .select('username, password')
+                    .select('id, username, password')
                     .ilike('username', usuario)
                     .eq('password', password)
                     .limit(1);
@@ -698,7 +835,7 @@
         });
 
         // =========================================================================
-        // 4. SINCRONIZACIÓN Y OPERACIONES DE EMPLEADOS (CREAR, EDITAR, BORRAR)
+        // 5. SINCRONIZACIÓN Y OPERACIONES DE EMPLEADOS (CREAR, EDITAR, BORRAR)
         // =========================================================================
         async function sincronizarDesdeSupabase(notificar = true) {
             if (!supabaseConfigurado) return;
@@ -834,7 +971,7 @@
         }
 
         // =========================================================================
-        // 5. OPERACIONES DE AUSENCIAS (CREAR, EDITAR, BORRAR)
+        // 6. OPERACIONES DE AUSENCIAS (CREAR, EDITAR, BORRAR)
         // =========================================================================
         function actualizarVisibilidadReposicion() {
             const tipo = document.getElementById('select-tipo').value;
@@ -907,7 +1044,18 @@
                 document.getElementById('input-observacion').value = '';
                 document.getElementById('input-fecha-reposicion').value = '';
                 await sincronizarDesdeSupabase(false);
-                mostrarToast('Ausencia registrada correctamente', 'success');
+
+                if (esIncapacidad(tipo)) {
+                    const incapsVentana = obtenerIncapacidadesEnVentana4Meses(empleadoId, fechaInicio);
+                    if (incapsVentana.length >= 2) {
+                        const nombreEmp = obtenerNombreEmpleado(empleadoId);
+                        mostrarToast(`ALERTA: ${nombreEmp} excedió el límite de incapacidades (${incapsVentana.length} en los últimos 4 meses).`, 'error', 6500);
+                    } else {
+                        mostrarToast('Incapacidad registrada correctamente', 'success');
+                    }
+                } else {
+                    mostrarToast('Permiso registrado correctamente', 'success');
+                }
             } catch (err) {
                 mostrarToast(`Error al guardar: ${err.message}`, 'error');
             } finally {
@@ -1013,7 +1161,18 @@
 
                 cerrarModalEditarAusencia();
                 await sincronizarDesdeSupabase(false);
-                mostrarToast('Registro actualizado correctamente', 'success');
+
+                if (esIncapacidad(tipo)) {
+                    const incapsVentana = obtenerIncapacidadesEnVentana4Meses(empleadoId, fechaInicio);
+                    if (incapsVentana.length >= 2) {
+                        const nombreEmp = obtenerNombreEmpleado(empleadoId);
+                        mostrarToast(`ALERTA: ${nombreEmp} excedió el límite de incapacidades (${incapsVentana.length} en los últimos 4 meses).`, 'error', 6500);
+                    } else {
+                        mostrarToast('Registro actualizado correctamente', 'success');
+                    }
+                } else {
+                    mostrarToast('Registro actualizado correctamente', 'success');
+                }
             } catch (err) {
                 mostrarToast(`Error al actualizar: ${err.message}`, 'error');
             } finally {
@@ -1041,7 +1200,7 @@
         }
 
         // =========================================================================
-        // 6. RENDERIZADO DE SELECTORES, KPIs, GRÁFICAS Y TABLA
+        // 7. RENDERIZADO DE SELECTORES, KPIs, GRÁFICAS Y TABLA
         // =========================================================================
         function inicializarSelectorAnios() {
             const selectAnio = document.getElementById('filtro-anio');
@@ -1249,9 +1408,14 @@
 
             tbody.innerHTML = lista.map(r => {
                 const nombreEmp = obtenerNombreEmpleado(r.empleado_id);
+                const incapsVentana = obtenerIncapacidadesEnVentana4Meses(r.empleado_id);
+                const alertaFila = (esIncapacidad(r.tipo) && incapsVentana.length >= 2)
+                    ? `<span class="ml-1.5 px-2 py-0.5 rounded-full bg-rose-600 text-white text-[10px] font-extrabold" title="Excedió límite de incapacidades en los últimos 4 meses">¡Límite!</span>`
+                    : '';
+
                 const badgeTipo = !esIncapacidad(r.tipo)
                     ? `<span class="inline-block px-2.5 py-1 rounded-full bg-purple-100 text-purple-800 text-xs font-bold">${escaparHTML(r.tipo)}</span>`
-                    : `<span class="inline-block px-2.5 py-1 rounded-full bg-rose-100 text-rose-700 text-xs font-bold">${escaparHTML(r.tipo)}</span>`;
+                    : `<span class="inline-block px-2.5 py-1 rounded-full bg-rose-100 text-rose-700 text-xs font-bold">${escaparHTML(r.tipo)}</span>${alertaFila}`;
 
                 const rangoFechas = r.fecha_inicio === r.fecha_fin
                     ? formatearFecha(r.fecha_inicio)
@@ -1292,6 +1456,7 @@
 
         function actualizarDashboard() {
             actualizarSelectsEmpleados();
+            evaluarAlertasIncapacidadesGlobales();
             const filtrados = obtenerRegistrosFiltradosGrafico();
             actualizarKPIs(filtrados);
             renderizarBotonesMeses(filtrados);
@@ -1300,7 +1465,7 @@
         }
 
         // =========================================================================
-        // 7. CALENDARIO INTERACTIVO MENSUAL
+        // 8. CALENDARIO INTERACTIVO MENSUAL
         // =========================================================================
         function abrirModalCalendario(mesIndex) {
             const anio = Number(document.getElementById('filtro-anio').value || new Date().getFullYear());
@@ -1360,7 +1525,7 @@
         }
 
         // =========================================================================
-        // 8. INICIALIZACIÓN AL CARGAR LA PÁGINA
+        // 9. INICIALIZACIÓN AL CARGAR LA PÁGINA
         // =========================================================================
         window.addEventListener('DOMContentLoaded', async () => {
             inicializarClienteSupabase();
