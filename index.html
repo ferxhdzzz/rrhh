@@ -1,0 +1,1380 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Control de Ausencias y Permisos</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background-color: #f8f7ff;
+            color: #1e1b4b;
+        }
+        .glass-card {
+            background: rgba(255, 255, 255, 0.96);
+            border: 1px solid #ede9fe;
+            box-shadow: 0 10px 25px -5px rgba(109, 40, 217, 0.06), 0 4px 10px -6px rgba(109, 40, 217, 0.04);
+        }
+        ::-webkit-scrollbar {
+            width: 7px;
+            height: 7px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f3e8ff;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #c4b5fd;
+            border-radius: 999px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #8b5cf6;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col antialiased selection:bg-purple-200 selection:text-purple-900">
+
+    <!-- Toast Flotante -->
+    <div id="toast-container" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 pointer-events-none"></div>
+
+    <!-- ==================== VISTA LOGIN ==================== -->
+    <div id="vista-login" class="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-purple-100/80 via-[#faf8ff] to-fuchsia-100/70">
+        <div class="w-full max-w-md bg-white rounded-3xl shadow-xl shadow-purple-900/10 border border-purple-100 p-8">
+            <div class="flex flex-col items-center text-center mb-7">
+                <div class="w-14 h-14 rounded-2xl bg-gradient-to-tr from-purple-700 to-violet-500 flex items-center justify-center text-white shadow-lg shadow-purple-500/30 mb-4">
+                    <svg class="w-7 h-7" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z"/>
+                    </svg>
+                </div>
+                <h1 class="text-2xl font-extrabold text-slate-900 tracking-tight">Control de Ausencias</h1>
+                <p class="text-sm text-slate-500 mt-1">Inicia sesión para gestionar permisos e incapacidades</p>
+            </div>
+
+            <div id="login-error" class="hidden mb-4 p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-medium flex items-start gap-2">
+                <svg class="w-4 h-4 shrink-0 mt-0.5 text-rose-600" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z"/>
+                </svg>
+                <span id="login-error-texto">Credenciales incorrectas.</span>
+            </div>
+
+            <form id="form-login" class="space-y-4">
+                <div>
+                    <label for="login-usuario" class="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">Usuario</label>
+                    <div class="relative">
+                        <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center text-purple-400">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z"/>
+                            </svg>
+                        </span>
+                        <input id="login-usuario" type="text" required autocomplete="username" placeholder="Ingresa tu usuario"
+                            class="w-full pl-10 pr-4 py-2.5 rounded-xl border border-purple-200 bg-purple-50/40 text-sm font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:bg-white transition" />
+                    </div>
+                </div>
+
+                <div>
+                    <label for="login-password" class="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">Contraseña</label>
+                    <div class="relative">
+                        <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center text-purple-400">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z"/>
+                            </svg>
+                        </span>
+                        <input id="login-password" type="password" required autocomplete="current-password" placeholder="••••••••"
+                            class="w-full pl-10 pr-11 py-2.5 rounded-xl border border-purple-200 bg-purple-50/40 text-sm font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:bg-white transition" />
+                        <button type="button" id="btn-toggle-password" title="Mostrar u ocultar contraseña"
+                            class="absolute inset-y-0 right-0 pr-3.5 flex items-center text-purple-500 hover:text-purple-700 focus:outline-none">
+                            <svg id="icono-ojo-abierto" class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z"/>
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                            </svg>
+                            <svg id="icono-ojo-cerrado" class="w-5 h-5 hidden" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M3.98 8.223A10.477 10.477 0 001.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.45 10.45 0 0112 4.5c4.756 0 8.773 3.162 10.065 7.498a10.523 10.523 0 01-4.293 5.774M6.228 6.228L3 3m3.228 3.228l3.65 3.65m7.894 7.894L21 21m-3.228-3.228l-3.65-3.65m0 0a3 3 0 10-4.243-4.243m4.242 4.242L9.88 9.88"/>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="flex items-center justify-between pt-1">
+                    <label class="inline-flex items-center gap-2 text-xs text-slate-600 cursor-pointer select-none">
+                        <input id="login-recordar" type="checkbox" checked class="rounded border-purple-300 text-purple-600 focus:ring-purple-500">
+                        <span>Recordar sesión</span>
+                    </label>
+                </div>
+
+                <button id="btn-submit-login" type="submit"
+                    class="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-purple-700 to-violet-600 hover:from-purple-800 hover:to-violet-700 text-white font-bold text-sm shadow-lg shadow-purple-500/25 transition flex items-center justify-center gap-2">
+                    <span>Entrar al Sistema</span>
+                </button>
+            </form>
+
+            <div id="aviso-config-supabase" class="hidden mt-5 p-3.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs leading-relaxed">
+                <strong>Falta tu Publishable Key:</strong> Abre este archivo HTML y pega tu <code>SUPABASE_ANON_KEY</code> al inicio del <code>&lt;script&gt;</code>.
+            </div>
+        </div>
+    </div>
+
+    <!-- ==================== VISTA PRINCIPAL (DASHBOARD) ==================== -->
+    <div id="vista-app" class="hidden flex-1 flex flex-col">
+        <!-- Barra Superior -->
+        <header class="sticky top-0 z-30 bg-white/90 backdrop-blur-md border-b border-purple-100">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-purple-700 to-violet-500 flex items-center justify-center text-white shadow-md shadow-purple-500/20">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5"/>
+                        </svg>
+                    </div>
+                    <div>
+                        <h1 class="text-base sm:text-lg font-extrabold text-slate-900 leading-tight">Control de Ausencias</h1>
+                        <div class="flex items-center gap-2 text-xs text-slate-500">
+                            <span class="inline-flex items-center gap-1 text-emerald-600 font-semibold">
+                                <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+                                Conectado a Supabase
+                            </span>
+                            <span>•</span>
+                            <span>Hola, <strong id="usuario-activo-label" class="text-purple-700">admin</strong></span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex items-center gap-2">
+                    <button type="button" onclick="sincronizarDesdeSupabase(true)"
+                        class="px-3 py-2 rounded-xl border border-purple-200 bg-purple-50 hover:bg-purple-100 text-purple-700 text-xs font-bold transition flex items-center gap-1.5">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99"/>
+                        </svg>
+                        <span class="hidden sm:inline">Sincronizar</span>
+                    </button>
+                    <button type="button" onclick="cerrarSesion()"
+                        class="px-3 py-2 rounded-xl border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-bold transition flex items-center gap-1.5">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15M12 9l-3 3m0 0l3 3m-3-3h12.75"/>
+                        </svg>
+                        <span>Salir</span>
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <!-- Contenido Principal -->
+        <main class="max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+
+            <!-- KPIs -->
+            <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div class="glass-card rounded-2xl p-5">
+                    <p class="text-xs font-bold uppercase tracking-wider text-slate-400">Total Registros</p>
+                    <p id="kpi-total" class="text-3xl font-extrabold text-slate-900 mt-1">0</p>
+                    <p class="text-xs text-purple-600 font-medium mt-1">En el año seleccionado</p>
+                </div>
+                <div class="glass-card rounded-2xl p-5">
+                    <p class="text-xs font-bold uppercase tracking-wider text-purple-500">Permisos (Todas las categorías)</p>
+                    <p id="kpi-permisos" class="text-3xl font-extrabold text-purple-700 mt-1">0</p>
+                    <p id="kpi-permisos-dias" class="text-xs text-slate-500 font-medium mt-1">0 días acumulados</p>
+                </div>
+                <div class="glass-card rounded-2xl p-5">
+                    <p class="text-xs font-bold uppercase tracking-wider text-rose-500">Incapacidades</p>
+                    <p id="kpi-incapacidades" class="text-3xl font-extrabold text-rose-600 mt-1">0</p>
+                    <p id="kpi-incapacidades-dias" class="text-xs text-slate-500 font-medium mt-1">0 días acumulados</p>
+                </div>
+                <div class="glass-card rounded-2xl p-5">
+                    <p class="text-xs font-bold uppercase tracking-wider text-emerald-600">Empleados Activos</p>
+                    <p id="kpi-empleados" class="text-3xl font-extrabold text-emerald-700 mt-1">0</p>
+                    <p class="text-xs text-slate-500 font-medium mt-1">Registrados en nube</p>
+                </div>
+            </section>
+
+            <!-- Registro + Gráficas -->
+            <section class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                <!-- Formulario de Registro -->
+                <div class="lg:col-span-5 glass-card rounded-3xl p-6 space-y-5">
+                    <div class="flex flex-wrap items-center justify-between gap-2">
+                        <div>
+                            <h2 class="text-lg font-extrabold text-slate-900">Nueva Ausencia</h2>
+                            <p class="text-xs text-slate-500">Gestiona empleados y registra ausencias</p>
+                        </div>
+                        <div class="flex items-center gap-1.5">
+                            <button type="button" onclick="abrirCajaEmpleado('crear')"
+                                class="px-2.5 py-1.5 rounded-xl bg-purple-100 hover:bg-purple-200 text-purple-700 text-xs font-bold transition">
+                                + Nuevo
+                            </button>
+                            <button type="button" onclick="abrirCajaEmpleado('editar')" title="Editar nombre del empleado seleccionado"
+                                class="px-2.5 py-1.5 rounded-xl bg-amber-100 hover:bg-amber-200 text-amber-800 text-xs font-bold transition">
+                                Editar
+                            </button>
+                            <button type="button" onclick="eliminarEmpleadoSeleccionado()" title="Eliminar empleado seleccionado"
+                                class="px-2.5 py-1.5 rounded-xl bg-rose-100 hover:bg-rose-200 text-rose-700 text-xs font-bold transition">
+                                Borrar
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Caja rápida para crear o editar empleado -->
+                    <div id="caja-empleado" class="hidden p-4 rounded-2xl bg-purple-50 border border-purple-200 space-y-3">
+                        <div class="flex items-center justify-between">
+                            <label id="label-caja-empleado" for="input-nombre-empleado" class="block text-xs font-bold text-purple-900">
+                                Nombre completo del empleado
+                            </label>
+                            <button type="button" onclick="cerrarCajaEmpleado()" class="text-xs text-slate-500 hover:text-slate-700 font-bold">✕</button>
+                        </div>
+                        <div class="flex gap-2">
+                            <input id="input-nombre-empleado" type="text" placeholder="Ej. María Fernanda López"
+                                class="flex-1 px-3 py-2 rounded-xl border border-purple-300 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-500" />
+                            <button id="btn-guardar-empleado" type="button" onclick="guardarEmpleado()"
+                                class="px-4 py-2 rounded-xl bg-purple-700 hover:bg-purple-800 text-white text-xs font-bold transition">
+                                Guardar
+                            </button>
+                        </div>
+                    </div>
+
+                    <form id="form-ausencia" class="space-y-4">
+                        <div>
+                            <label for="select-empleado" class="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1">Empleado</label>
+                            <select id="select-empleado" required
+                                class="w-full px-3.5 py-2.5 rounded-xl border border-purple-200 bg-white text-sm font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-purple-500">
+                                <option value="">Selecciona un empleado...</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label for="select-tipo" class="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1">Tipo de Permiso / Ausencia</label>
+                            <select id="select-tipo" required onchange="actualizarVisibilidadReposicion()"
+                                class="w-full px-3.5 py-2.5 rounded-xl border border-purple-200 bg-white text-sm font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-purple-500">
+                                <optgroup label="Permisos">
+                                    <option value="Permiso Personal">Permiso Personal</option>
+                                    <option value="Olvido de marcación">Olvido de marcación</option>
+                                    <option value="Cumpleaños">Cumpleaños</option>
+                                    <option value="Enfermedad personal">Enfermedad personal</option>
+                                    <option value="Tiempo compensatorio">Tiempo compensatorio</option>
+                                    <option value="Prenatal y parto">Prenatal y parto</option>
+                                    <option value="Enfermedad familiar y duelo">Enfermedad familiar y duelo</option>
+                                    <option value="Asuntos escolares y emergencias de hijos">Asuntos escolares y emergencias de hijos</option>
+                                </optgroup>
+                                <optgroup label="Incapacidades">
+                                    <option value="Incapacidad">Incapacidad</option>
+                                </optgroup>
+                            </select>
+                        </div>
+
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div>
+                                <label for="input-fecha-inicio" class="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1">Fecha Inicio</label>
+                                <input id="input-fecha-inicio" type="date" required onchange="calcularDiasForm()"
+                                    class="w-full px-3.5 py-2.5 rounded-xl border border-purple-200 bg-white text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-purple-500" />
+                            </div>
+                            <div>
+                                <label for="input-fecha-fin" class="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1">Fecha Fin</label>
+                                <input id="input-fecha-fin" type="date" required onchange="calcularDiasForm()"
+                                    class="w-full px-3.5 py-2.5 rounded-xl border border-purple-200 bg-white text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-purple-500" />
+                            </div>
+                        </div>
+
+                        <div class="flex items-center justify-between px-3.5 py-2 rounded-xl bg-purple-50 border border-purple-100 text-xs">
+                            <span class="font-semibold text-purple-900">Duración calculada:</span>
+                            <span id="label-dias-calculados" class="font-extrabold text-purple-700">1 día</span>
+                        </div>
+
+                        <!-- Campo Fecha de Reposición (visible para permisos) -->
+                        <div id="grupo-fecha-reposicion" class="p-3.5 rounded-2xl bg-emerald-50/70 border border-emerald-200 space-y-1.5">
+                            <label for="input-fecha-reposicion" class="block text-xs font-bold text-emerald-900">
+                                ¿Qué día va a reponer el permiso? <span class="font-normal text-emerald-700">(Opcional)</span>
+                            </label>
+                            <input id="input-fecha-reposicion" type="date"
+                                class="w-full px-3.5 py-2 rounded-xl border border-emerald-300 bg-white text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+                        </div>
+
+                        <div>
+                            <label for="input-observacion" class="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1">Motivo / Observación</label>
+                            <textarea id="input-observacion" rows="2" placeholder="Ej. Cita médica, trámite personal..."
+                                class="w-full px-3.5 py-2 rounded-xl border border-purple-200 bg-white text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-purple-500"></textarea>
+                        </div>
+
+                        <button id="btn-guardar-ausencia" type="submit"
+                            class="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-purple-700 to-violet-600 hover:from-purple-800 hover:to-violet-700 text-white font-bold text-sm shadow-lg shadow-purple-500/25 transition">
+                            Registrar Ausencia
+                        </button>
+                    </form>
+                </div>
+
+                <!-- Gráficos y Selector de Meses -->
+                <div class="lg:col-span-7 glass-card rounded-3xl p-6 flex flex-col justify-between space-y-5">
+                    <div class="flex flex-wrap items-center justify-between gap-3">
+                        <div>
+                            <h2 class="text-lg font-extrabold text-slate-900">Estadísticas Mensuales</h2>
+                            <p class="text-xs text-slate-500">Toca un mes para abrir el calendario detallado de días</p>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <select id="filtro-empleado-grafico" onchange="actualizarDashboard()"
+                                class="px-3 py-1.5 rounded-xl border border-purple-200 bg-purple-50/60 text-xs font-bold text-purple-900 focus:outline-none">
+                                <option value="TODOS">Todos los empleados</option>
+                            </select>
+                            <select id="filtro-anio" onchange="actualizarDashboard()"
+                                class="px-3 py-1.5 rounded-xl border border-purple-200 bg-purple-50/60 text-xs font-bold text-purple-900 focus:outline-none">
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Botonera de Meses para abrir Calendario -->
+                    <div id="grid-botones-meses" class="grid grid-cols-4 sm:grid-cols-6 gap-2"></div>
+
+                    <!-- Contenedor de Gráficos -->
+                    <div class="grid grid-cols-1 md:grid-cols-12 gap-4 items-center pt-2">
+                        <div class="md:col-span-8 h-64">
+                            <canvas id="grafico-mensual"></canvas>
+                        </div>
+                        <div class="md:col-span-4 h-56">
+                            <canvas id="grafico-dona"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Tabla de Historial -->
+            <section class="glass-card rounded-3xl p-6 space-y-4">
+                <div class="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                        <h2 class="text-lg font-extrabold text-slate-900">Historial de Registros</h2>
+                        <p class="text-xs text-slate-500">Filtra, edita o elimina cualquier permiso o incapacidad</p>
+                    </div>
+                    <div class="flex flex-wrap items-center gap-2">
+                        <input id="busqueda-tabla" type="text" oninput="renderizarTabla()" placeholder="Buscar empleado o motivo..."
+                            class="px-3.5 py-2 rounded-xl border border-purple-200 bg-white text-xs font-medium focus:outline-none focus:ring-2 focus:ring-purple-500" />
+                        <select id="filtro-tipo-tabla" onchange="renderizarTabla()"
+                            class="px-3 py-2 rounded-xl border border-purple-200 bg-white text-xs font-bold text-slate-700 focus:outline-none">
+                            <option value="TODOS">Todos los tipos</option>
+                            <option value="SOLO_PERMISOS">Todos los permisos</option>
+                            <option value="Permiso Personal">Permiso Personal</option>
+                            <option value="Olvido de marcación">Olvido de marcación</option>
+                            <option value="Cumpleaños">Cumpleaños</option>
+                            <option value="Enfermedad personal">Enfermedad personal</option>
+                            <option value="Tiempo compensatorio">Tiempo compensatorio</option>
+                            <option value="Prenatal y parto">Prenatal y parto</option>
+                            <option value="Enfermedad familiar y duelo">Enfermedad familiar y duelo</option>
+                            <option value="Asuntos escolares y emergencias de hijos">Asuntos escolares y emergencias de hijos</option>
+                            <option value="Incapacidad">Incapacidad</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="border-b border-purple-100 text-[11px] font-extrabold uppercase tracking-wider text-purple-800 bg-purple-50/70">
+                                <th class="py-3 px-4 rounded-tl-xl">Empleado</th>
+                                <th class="py-3 px-4">Tipo</th>
+                                <th class="py-3 px-4">Fechas</th>
+                                <th class="py-3 px-4">Días</th>
+                                <th class="py-3 px-4">Reposición</th>
+                                <th class="py-3 px-4">Observación</th>
+                                <th class="py-3 px-4 text-right rounded-tr-xl">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tbody-ausencias" class="divide-y divide-purple-50 text-sm"></tbody>
+                    </table>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- ==================== MODAL EDITAR AUSENCIA ==================== -->
+    <div id="modal-editar-ausencia" class="hidden fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4">
+        <div class="bg-white rounded-3xl max-w-lg w-full border border-purple-100 shadow-2xl overflow-hidden max-h-[92vh] flex flex-col">
+            <div class="px-6 py-4 bg-gradient-to-r from-purple-700 to-violet-600 text-white flex items-center justify-between shrink-0">
+                <div>
+                    <h3 class="text-lg font-extrabold">Editar Registro</h3>
+                    <p class="text-xs text-purple-100">Modifica los datos de la ausencia seleccionada</p>
+                </div>
+                <button type="button" onclick="cerrarModalEditarAusencia()" class="p-1.5 rounded-xl bg-white/15 hover:bg-white/25 text-white transition">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+
+            <form id="form-editar-ausencia" class="p-6 space-y-4 overflow-y-auto">
+                <input type="hidden" id="edit-ausencia-id" />
+
+                <div>
+                    <label for="edit-select-empleado" class="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1">Empleado</label>
+                    <select id="edit-select-empleado" required
+                        class="w-full px-3.5 py-2.5 rounded-xl border border-purple-200 bg-white text-sm font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-purple-500">
+                    </select>
+                </div>
+
+                <div>
+                    <label for="edit-select-tipo" class="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1">Tipo de Permiso / Ausencia</label>
+                    <select id="edit-select-tipo" required onchange="actualizarVisibilidadReposicionEdit()"
+                        class="w-full px-3.5 py-2.5 rounded-xl border border-purple-200 bg-white text-sm font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-purple-500">
+                        <optgroup label="Permisos">
+                            <option value="Permiso Personal">Permiso Personal</option>
+                            <option value="Olvido de marcación">Olvido de marcación</option>
+                            <option value="Cumpleaños">Cumpleaños</option>
+                            <option value="Enfermedad personal">Enfermedad personal</option>
+                            <option value="Tiempo compensatorio">Tiempo compensatorio</option>
+                            <option value="Prenatal y parto">Prenatal y parto</option>
+                            <option value="Enfermedad familiar y duelo">Enfermedad familiar y duelo</option>
+                            <option value="Asuntos escolares y emergencias de hijos">Asuntos escolares y emergencias de hijos</option>
+                        </optgroup>
+                        <optgroup label="Incapacidades">
+                            <option value="Incapacidad">Incapacidad</option>
+                        </optgroup>
+                    </select>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                        <label for="edit-fecha-inicio" class="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1">Fecha Inicio</label>
+                        <input id="edit-fecha-inicio" type="date" required onchange="calcularDiasEdit()"
+                            class="w-full px-3.5 py-2.5 rounded-xl border border-purple-200 bg-white text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-purple-500" />
+                    </div>
+                    <div>
+                        <label for="edit-fecha-fin" class="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1">Fecha Fin</label>
+                        <input id="edit-fecha-fin" type="date" required onchange="calcularDiasEdit()"
+                            class="w-full px-3.5 py-2.5 rounded-xl border border-purple-200 bg-white text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-purple-500" />
+                    </div>
+                </div>
+
+                <div class="flex items-center justify-between px-3.5 py-2 rounded-xl bg-purple-50 border border-purple-100 text-xs">
+                    <span class="font-semibold text-purple-900">Duración calculada:</span>
+                    <span id="edit-label-dias" class="font-extrabold text-purple-700">1 día</span>
+                </div>
+
+                <div id="edit-grupo-reposicion" class="p-3.5 rounded-2xl bg-emerald-50/70 border border-emerald-200 space-y-1.5">
+                    <label for="edit-fecha-reposicion" class="block text-xs font-bold text-emerald-900">
+                        ¿Qué día va a reponer el permiso? <span class="font-normal text-emerald-700">(Opcional)</span>
+                    </label>
+                    <input id="edit-fecha-reposicion" type="date"
+                        class="w-full px-3.5 py-2 rounded-xl border border-emerald-300 bg-white text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+                </div>
+
+                <div>
+                    <label for="edit-observacion" class="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1">Motivo / Observación</label>
+                    <textarea id="edit-observacion" rows="2"
+                        class="w-full px-3.5 py-2 rounded-xl border border-purple-200 bg-white text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-purple-500"></textarea>
+                </div>
+
+                <div class="flex items-center justify-end gap-2 pt-2">
+                    <button type="button" onclick="cerrarModalEditarAusencia()"
+                        class="px-4 py-2.5 rounded-xl border border-slate-200 text-slate-600 text-xs font-bold hover:bg-slate-50 transition">
+                        Cancelar
+                    </button>
+                    <button id="btn-actualizar-ausencia" type="submit"
+                        class="px-5 py-2.5 rounded-xl bg-gradient-to-r from-purple-700 to-violet-600 hover:from-purple-800 hover:to-violet-700 text-white text-xs font-bold shadow-md transition">
+                        Guardar Cambios
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ==================== MODAL CALENDARIO MENSUAL ==================== -->
+    <div id="modal-calendario" class="hidden fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4">
+        <div class="bg-white rounded-3xl max-w-3xl w-full border border-purple-100 shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+            <div class="px-6 py-4 bg-gradient-to-r from-purple-700 to-violet-600 text-white flex items-center justify-between">
+                <div>
+                    <h3 id="modal-cal-titulo" class="text-lg font-extrabold">Calendario Mensual</h3>
+                    <p id="modal-cal-subtitulo" class="text-xs text-purple-100">Detalle exacto de permisos, incapacidades y reposiciones</p>
+                </div>
+                <button type="button" onclick="cerrarModalCalendario()" class="p-1.5 rounded-xl bg-white/15 hover:bg-white/25 text-white transition">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+
+            <div class="px-6 py-3 bg-purple-50 border-b border-purple-100 flex flex-wrap items-center gap-4 text-xs font-semibold">
+                <span class="inline-flex items-center gap-1.5 text-purple-800"><span class="w-3 h-3 rounded bg-purple-600"></span> Permisos</span>
+                <span class="inline-flex items-center gap-1.5 text-rose-700"><span class="w-3 h-3 rounded bg-rose-500"></span> Incapacidad</span>
+                <span class="inline-flex items-center gap-1.5 text-emerald-700"><span class="w-3 h-3 rounded bg-emerald-500"></span> Día de Reposición</span>
+            </div>
+
+            <div class="p-6 overflow-y-auto space-y-4">
+                <div class="grid grid-cols-7 gap-1.5 text-center text-xs font-extrabold text-purple-900">
+                    <div>Dom</div><div>Lun</div><div>Mar</div><div>Mié</div><div>Jue</div><div>Vie</div><div>Sáb</div>
+                </div>
+                <div id="grid-dias-calendario" class="grid grid-cols-7 gap-1.5"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // =========================================================================
+        // 1. CONFIGURACIÓN DE SUPABASE (SOLO PEGA TU PUBLISHABLE KEY ABAJO)
+        // =========================================================================
+        const SUPABASE_URL = 'https://xkypcmmexrxeewsenigf.supabase.co';
+        const SUPABASE_ANON_KEY = 'sb_publishable_a3-3O68SYYekFMBg_MpTxw_X3GfilNO';
+
+        let supabaseClient = null;
+        let supabaseConfigurado = false;
+        let empleados = [];
+        let registros = [];
+        let chartMensual = null;
+        let chartDona = null;
+        let modoCajaEmpleado = 'crear';
+
+        const MESES_CORTOS = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+        const MESES_LARGOS = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+
+        function esIncapacidad(tipo) {
+            return String(tipo || '').trim().toLowerCase() === 'incapacidad';
+        }
+
+        // =========================================================================
+        // 2. UTILIDADES GENERALES
+        // =========================================================================
+        function escaparHTML(texto) {
+            if (texto === null || texto === undefined) return '';
+            return String(texto)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+        }
+
+        function mostrarToast(mensaje, tipo = 'info') {
+            const container = document.getElementById('toast-container');
+            if (!container) return;
+
+            const colores = {
+                success: 'border-l-4 border-emerald-500',
+                error: 'border-l-4 border-rose-500',
+                info: 'border-l-4 border-purple-500'
+            };
+
+            const toast = document.createElement('div');
+            toast.className = `pointer-events-auto bg-slate-900 text-white text-xs font-semibold px-4 py-3 rounded-xl shadow-xl ${colores[tipo] || colores.info} transition-all duration-300`;
+            toast.innerHTML = escaparHTML(mensaje);
+            container.appendChild(toast);
+
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                setTimeout(() => toast.remove(), 300);
+            }, 3500);
+        }
+
+        function inicializarClienteSupabase() {
+            const url = (SUPABASE_URL || '').trim();
+            const key = (SUPABASE_ANON_KEY || '').trim();
+
+            if (!url.startsWith('https://') || url.includes('PEGA_AQUI')) {
+                supabaseConfigurado = false;
+                return;
+            }
+            if (!key || key.includes('PEGA_AQUI') || key.length < 15) {
+                supabaseConfigurado = false;
+                return;
+            }
+            if (!window.supabase || typeof window.supabase.createClient !== 'function') {
+                supabaseConfigurado = false;
+                return;
+            }
+
+            supabaseClient = window.supabase.createClient(url, key);
+            supabaseConfigurado = true;
+        }
+
+        function obtenerNombreEmpleado(empleadoId) {
+            const emp = empleados.find(e => Number(e.id) === Number(empleadoId));
+            return emp ? emp.nombre : 'Empleado eliminado';
+        }
+
+        function formatearFecha(fechaStr) {
+            if (!fechaStr) return '—';
+            const partes = String(fechaStr).split('-');
+            if (partes.length !== 3) return fechaStr;
+            return `${partes[2]}/${partes[1]}/${partes[0]}`;
+        }
+
+        // =========================================================================
+        // 3. AUTENTICACIÓN Y LOGIN
+        // =========================================================================
+        function mostrarErrorLogin(mensaje) {
+            const box = document.getElementById('login-error');
+            const txt = document.getElementById('login-error-texto');
+            if (txt) txt.textContent = mensaje;
+            if (box) box.classList.remove('hidden');
+            mostrarToast(mensaje, 'error');
+        }
+
+        function ocultarErrorLogin() {
+            const box = document.getElementById('login-error');
+            if (box) box.classList.add('hidden');
+        }
+
+        async function mostrarAplicacion(username) {
+            document.getElementById('vista-login').classList.add('hidden');
+            document.getElementById('vista-app').classList.remove('hidden');
+            document.getElementById('usuario-activo-label').textContent = username;
+
+            const hoy = new Date().toISOString().split('T')[0];
+            document.getElementById('input-fecha-inicio').value = hoy;
+            document.getElementById('input-fecha-fin').value = hoy;
+            calcularDiasForm();
+
+            await sincronizarDesdeSupabase(false);
+        }
+
+        function cerrarSesion() {
+            localStorage.removeItem('ausencias_usuario');
+            sessionStorage.removeItem('ausencias_usuario');
+            document.getElementById('login-password').value = '';
+            document.getElementById('login-password').type = 'password';
+            document.getElementById('icono-ojo-abierto').classList.remove('hidden');
+            document.getElementById('icono-ojo-cerrado').classList.add('hidden');
+            document.getElementById('vista-app').classList.add('hidden');
+            document.getElementById('vista-login').classList.remove('hidden');
+        }
+
+        document.getElementById('btn-toggle-password').addEventListener('click', () => {
+            const inputPass = document.getElementById('login-password');
+            const ojoAbierto = document.getElementById('icono-ojo-abierto');
+            const ojoCerrado = document.getElementById('icono-ojo-cerrado');
+            if (inputPass.type === 'password') {
+                inputPass.type = 'text';
+                ojoAbierto.classList.add('hidden');
+                ojoCerrado.classList.remove('hidden');
+            } else {
+                inputPass.type = 'password';
+                ojoAbierto.classList.remove('hidden');
+                ojoCerrado.classList.add('hidden');
+            }
+        });
+
+        document.getElementById('form-login').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            ocultarErrorLogin();
+
+            if (!supabaseConfigurado) {
+                mostrarErrorLogin('Primero pega tu SUPABASE_ANON_KEY en el código del archivo.');
+                return;
+            }
+
+            const usuario = document.getElementById('login-usuario').value.trim();
+            const password = document.getElementById('login-password').value.trim();
+            const recordar = document.getElementById('login-recordar').checked;
+            const btn = document.getElementById('btn-submit-login');
+
+            btn.disabled = true;
+            btn.textContent = 'Verificando...';
+
+            try {
+                const { data, error } = await supabaseClient
+                    .from('usuarios')
+                    .select('id, username, password')
+                    .ilike('username', usuario)
+                    .eq('password', password)
+                    .limit(1);
+
+                if (error) {
+                    mostrarErrorLogin(`Error de Supabase: ${error.message}`);
+                    return;
+                }
+
+                if (!data || data.length === 0) {
+                    mostrarErrorLogin('Usuario o contraseña incorrectos.');
+                    return;
+                }
+
+                const usuarioValido = data[0].username;
+                if (recordar) {
+                    localStorage.setItem('ausencias_usuario', usuarioValido);
+                } else {
+                    sessionStorage.setItem('ausencias_usuario', usuarioValido);
+                }
+
+                await mostrarAplicacion(usuarioValido);
+                mostrarToast(`Bienvenido, ${usuarioValido}`, 'success');
+            } catch (err) {
+                mostrarErrorLogin(`Error inesperado: ${err.message}`);
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Entrar al Sistema';
+            }
+        });
+
+        // =========================================================================
+        // 4. SINCRONIZACIÓN Y OPERACIONES DE EMPLEADOS (CREAR, EDITAR, BORRAR)
+        // =========================================================================
+        async function sincronizarDesdeSupabase(notificar = true) {
+            if (!supabaseConfigurado) return;
+
+            try {
+                const [resEmpleados, resAusencias] = await Promise.all([
+                    supabaseClient.from('empleados').select('*').order('nombre', { ascending: true }),
+                    supabaseClient.from('ausencias').select('*').order('fecha_inicio', { ascending: false })
+                ]);
+
+                if (resEmpleados.error) throw resEmpleados.error;
+                if (resAusencias.error) throw resAusencias.error;
+
+                empleados = resEmpleados.data || [];
+                registros = resAusencias.data || [];
+
+                inicializarSelectorAnios();
+                actualizarDashboard();
+
+                if (notificar) {
+                    mostrarToast('Datos sincronizados con Supabase', 'success');
+                }
+            } catch (err) {
+                console.error('Error al cargar datos de Supabase:', err);
+                mostrarToast(`Error al cargar datos: ${err.message}`, 'error');
+            }
+        }
+
+        function abrirCajaEmpleado(modo) {
+            const caja = document.getElementById('caja-empleado');
+            const label = document.getElementById('label-caja-empleado');
+            const input = document.getElementById('input-nombre-empleado');
+            const btn = document.getElementById('btn-guardar-empleado');
+
+            modoCajaEmpleado = modo;
+
+            if (modo === 'editar') {
+                const empId = document.getElementById('select-empleado').value;
+                if (!empId) {
+                    mostrarToast('Selecciona primero el empleado que deseas editar', 'error');
+                    return;
+                }
+                label.textContent = 'Editar nombre del empleado';
+                input.value = obtenerNombreEmpleado(empId);
+                btn.textContent = 'Actualizar';
+            } else {
+                label.textContent = 'Nombre completo del nuevo empleado';
+                input.value = '';
+                btn.textContent = 'Guardar';
+            }
+
+            caja.classList.remove('hidden');
+            input.focus();
+        }
+
+        function cerrarCajaEmpleado() {
+            document.getElementById('caja-empleado').classList.add('hidden');
+            document.getElementById('input-nombre-empleado').value = '';
+        }
+
+        async function guardarEmpleado() {
+            const input = document.getElementById('input-nombre-empleado');
+            const nombre = input.value.trim();
+            if (!nombre) {
+                mostrarToast('Escribe el nombre del empleado', 'error');
+                return;
+            }
+
+            try {
+                if (modoCajaEmpleado === 'editar') {
+                    const empId = Number(document.getElementById('select-empleado').value);
+                    if (!empId) return;
+
+                    const { error } = await supabaseClient
+                        .from('empleados')
+                        .update({ nombre })
+                        .eq('id', empId);
+
+                    if (error) throw error;
+
+                    cerrarCajaEmpleado();
+                    await sincronizarDesdeSupabase(false);
+                    document.getElementById('select-empleado').value = empId;
+                    mostrarToast(`Empleado actualizado a "${nombre}"`, 'success');
+                } else {
+                    const { data, error } = await supabaseClient
+                        .from('empleados')
+                        .insert([{ nombre }])
+                        .select();
+
+                    if (error) throw error;
+
+                    cerrarCajaEmpleado();
+                    await sincronizarDesdeSupabase(false);
+
+                    if (data && data[0]) {
+                        document.getElementById('select-empleado').value = data[0].id;
+                    }
+                    mostrarToast(`Empleado "${nombre}" registrado`, 'success');
+                }
+            } catch (err) {
+                mostrarToast(`Error con empleado: ${err.message}`, 'error');
+            }
+        }
+
+        async function eliminarEmpleadoSeleccionado() {
+            const empId = document.getElementById('select-empleado').value;
+            if (!empId) {
+                mostrarToast('Selecciona primero el empleado que deseas borrar', 'error');
+                return;
+            }
+
+            const nombre = obtenerNombreEmpleado(empId);
+            if (!confirm(`¿Seguro que deseas eliminar a "${nombre}" y todos sus permisos/incapacidades registrados?`)) {
+                return;
+            }
+
+            try {
+                const { error } = await supabaseClient
+                    .from('empleados')
+                    .delete()
+                    .eq('id', Number(empId));
+
+                if (error) throw error;
+
+                cerrarCajaEmpleado();
+                document.getElementById('select-empleado').value = '';
+                await sincronizarDesdeSupabase(false);
+                mostrarToast(`Empleado "${nombre}" eliminado`, 'info');
+            } catch (err) {
+                mostrarToast(`No se pudo eliminar empleado: ${err.message}`, 'error');
+            }
+        }
+
+        // =========================================================================
+        // 5. OPERACIONES DE AUSENCIAS (CREAR, EDITAR, BORRAR)
+        // =========================================================================
+        function actualizarVisibilidadReposicion() {
+            const tipo = document.getElementById('select-tipo').value;
+            const grupo = document.getElementById('grupo-fecha-reposicion');
+            if (!esIncapacidad(tipo)) {
+                grupo.classList.remove('hidden');
+            } else {
+                grupo.classList.add('hidden');
+                document.getElementById('input-fecha-reposicion').value = '';
+            }
+        }
+
+        function calcularDiasEntre(inicio, fin) {
+            if (!inicio || !fin) return 0;
+            const d1 = new Date(inicio + 'T00:00:00');
+            const d2 = new Date(fin + 'T00:00:00');
+            if (d2 < d1) return -1;
+            return Math.round((d2 - d1) / (1000 * 60 * 60 * 24)) + 1;
+        }
+
+        function calcularDiasForm() {
+            const inicio = document.getElementById('input-fecha-inicio').value;
+            const fin = document.getElementById('input-fecha-fin').value;
+            const label = document.getElementById('label-dias-calculados');
+
+            let diff = calcularDiasEntre(inicio, fin);
+            if (diff === -1) {
+                document.getElementById('input-fecha-fin').value = inicio;
+                diff = 1;
+            }
+            label.textContent = `${diff} ${diff === 1 ? 'día' : 'días'}`;
+            return diff;
+        }
+
+        document.getElementById('form-ausencia').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const empleadoId = document.getElementById('select-empleado').value;
+            const tipo = document.getElementById('select-tipo').value;
+            const fechaInicio = document.getElementById('input-fecha-inicio').value;
+            const fechaFin = document.getElementById('input-fecha-fin').value;
+            const dias = calcularDiasForm();
+            const fechaReposicion = !esIncapacidad(tipo)
+                ? (document.getElementById('input-fecha-reposicion').value || null)
+                : null;
+            const observacion = document.getElementById('input-observacion').value.trim();
+
+            if (!empleadoId) {
+                mostrarToast('Selecciona o crea un empleado primero', 'error');
+                return;
+            }
+
+            const btn = document.getElementById('btn-guardar-ausencia');
+            btn.disabled = true;
+            btn.textContent = 'Guardando...';
+
+            try {
+                const { error } = await supabaseClient.from('ausencias').insert([{
+                    empleado_id: Number(empleadoId),
+                    tipo,
+                    fecha_inicio: fechaInicio,
+                    fecha_fin: fechaFin,
+                    dias,
+                    fecha_reposicion: fechaReposicion,
+                    observacion
+                }]);
+
+                if (error) throw error;
+
+                document.getElementById('input-observacion').value = '';
+                document.getElementById('input-fecha-reposicion').value = '';
+                await sincronizarDesdeSupabase(false);
+                mostrarToast('Ausencia registrada correctamente', 'success');
+            } catch (err) {
+                mostrarToast(`Error al guardar: ${err.message}`, 'error');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Registrar Ausencia';
+            }
+        });
+
+        function abrirModalEditarAusencia(id) {
+            const reg = registros.find(r => Number(r.id) === Number(id));
+            if (!reg) return;
+
+            const selectEditEmp = document.getElementById('edit-select-empleado');
+            selectEditEmp.innerHTML = empleados.map(e =>
+                `<option value="${e.id}">${escaparHTML(e.nombre)}</option>`
+            ).join('');
+
+            document.getElementById('edit-ausencia-id').value = reg.id;
+            selectEditEmp.value = reg.empleado_id;
+
+            const selectEditTipo = document.getElementById('edit-select-tipo');
+            const existeOpcion = Array.from(selectEditTipo.options).some(opt => opt.value === reg.tipo);
+            if (!existeOpcion && reg.tipo) {
+                const optExtra = document.createElement('option');
+                optExtra.value = reg.tipo;
+                optExtra.textContent = reg.tipo;
+                selectEditTipo.appendChild(optExtra);
+            }
+            selectEditTipo.value = reg.tipo;
+
+            document.getElementById('edit-fecha-inicio').value = reg.fecha_inicio;
+            document.getElementById('edit-fecha-fin').value = reg.fecha_fin;
+            document.getElementById('edit-fecha-reposicion').value = reg.fecha_reposicion || '';
+            document.getElementById('edit-observacion').value = reg.observacion || '';
+
+            actualizarVisibilidadReposicionEdit();
+            calcularDiasEdit();
+            document.getElementById('modal-editar-ausencia').classList.remove('hidden');
+        }
+
+        function cerrarModalEditarAusencia() {
+            document.getElementById('modal-editar-ausencia').classList.add('hidden');
+        }
+
+        function actualizarVisibilidadReposicionEdit() {
+            const tipo = document.getElementById('edit-select-tipo').value;
+            const grupo = document.getElementById('edit-grupo-reposicion');
+            if (!esIncapacidad(tipo)) {
+                grupo.classList.remove('hidden');
+            } else {
+                grupo.classList.add('hidden');
+                document.getElementById('edit-fecha-reposicion').value = '';
+            }
+        }
+
+        function calcularDiasEdit() {
+            const inicio = document.getElementById('edit-fecha-inicio').value;
+            const fin = document.getElementById('edit-fecha-fin').value;
+            const label = document.getElementById('edit-label-dias');
+
+            let diff = calcularDiasEntre(inicio, fin);
+            if (diff === -1) {
+                document.getElementById('edit-fecha-fin').value = inicio;
+                diff = 1;
+            }
+            label.textContent = `${diff} ${diff === 1 ? 'día' : 'días'}`;
+            return diff;
+        }
+
+        document.getElementById('form-editar-ausencia').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const id = Number(document.getElementById('edit-ausencia-id').value);
+            const empleadoId = Number(document.getElementById('edit-select-empleado').value);
+            const tipo = document.getElementById('edit-select-tipo').value;
+            const fechaInicio = document.getElementById('edit-fecha-inicio').value;
+            const fechaFin = document.getElementById('edit-fecha-fin').value;
+            const dias = calcularDiasEdit();
+            const fechaReposicion = !esIncapacidad(tipo)
+                ? (document.getElementById('edit-fecha-reposicion').value || null)
+                : null;
+            const observacion = document.getElementById('edit-observacion').value.trim();
+
+            const btn = document.getElementById('btn-actualizar-ausencia');
+            btn.disabled = true;
+            btn.textContent = 'Actualizando...';
+
+            try {
+                const { error } = await supabaseClient
+                    .from('ausencias')
+                    .update({
+                        empleado_id: empleadoId,
+                        tipo,
+                        fecha_inicio: fechaInicio,
+                        fecha_fin: fechaFin,
+                        dias,
+                        fecha_reposicion: fechaReposicion,
+                        observacion
+                    })
+                    .eq('id', id);
+
+                if (error) throw error;
+
+                cerrarModalEditarAusencia();
+                await sincronizarDesdeSupabase(false);
+                mostrarToast('Registro actualizado correctamente', 'success');
+            } catch (err) {
+                mostrarToast(`Error al actualizar: ${err.message}`, 'error');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Guardar Cambios';
+            }
+        });
+
+        async function eliminarAusencia(id) {
+            if (!confirm('¿Seguro que deseas eliminar este registro?')) return;
+
+            try {
+                const { error } = await supabaseClient
+                    .from('ausencias')
+                    .delete()
+                    .eq('id', id);
+
+                if (error) throw error;
+
+                await sincronizarDesdeSupabase(false);
+                mostrarToast('Registro eliminado', 'info');
+            } catch (err) {
+                mostrarToast(`Error al eliminar: ${err.message}`, 'error');
+            }
+        }
+
+        // =========================================================================
+        // 6. RENDERIZADO DE SELECTORES, KPIs, GRÁFICAS Y TABLA
+        // =========================================================================
+        function inicializarSelectorAnios() {
+            const selectAnio = document.getElementById('filtro-anio');
+            if (!selectAnio) return;
+
+            const anioActual = new Date().getFullYear();
+            const anios = new Set([anioActual - 1, anioActual, anioActual + 1]);
+
+            registros.forEach(r => {
+                if (r.fecha_inicio) {
+                    const anio = parseInt(String(r.fecha_inicio).substring(0, 4), 10);
+                    if (!isNaN(anio)) anios.add(anio);
+                }
+            });
+
+            const prev = selectAnio.value;
+            selectAnio.innerHTML = Array.from(anios)
+                .sort((a, b) => b - a)
+                .map(a => `<option value="${a}">${a}</option>`)
+                .join('');
+
+            selectAnio.value = (prev && anios.has(Number(prev))) ? prev : String(anioActual);
+        }
+
+        function actualizarSelectsEmpleados() {
+            const selectForm = document.getElementById('select-empleado');
+            const selectGrafico = document.getElementById('filtro-empleado-grafico');
+
+            const valForm = selectForm.value;
+            const valGraf = selectGrafico.value;
+
+            selectForm.innerHTML = '<option value="">Selecciona un empleado...</option>' +
+                empleados.map(e => `<option value="${e.id}">${escaparHTML(e.nombre)}</option>`).join('');
+
+            selectGrafico.innerHTML = '<option value="TODOS">Todos los empleados</option>' +
+                empleados.map(e => `<option value="${e.id}">${escaparHTML(e.nombre)}</option>`).join('');
+
+            if (valForm && empleados.some(e => String(e.id) === String(valForm))) {
+                selectForm.value = valForm;
+            }
+            if (valGraf && (valGraf === 'TODOS' || empleados.some(e => String(e.id) === String(valGraf)))) {
+                selectGrafico.value = valGraf;
+            }
+        }
+
+        function obtenerRegistrosFiltradosGrafico() {
+            const anio = Number(document.getElementById('filtro-anio').value || new Date().getFullYear());
+            const empFiltro = document.getElementById('filtro-empleado-grafico').value;
+
+            return registros.filter(r => {
+                const anioReg = Number(String(r.fecha_inicio || '').substring(0, 4));
+                const coincideAnio = anioReg === anio;
+                const coincideEmp = empFiltro === 'TODOS' || Number(r.empleado_id) === Number(empFiltro);
+                return coincideAnio && coincideEmp;
+            });
+        }
+
+        function actualizarKPIs(filtrados) {
+            const permisos = filtrados.filter(r => !esIncapacidad(r.tipo));
+            const incapacidades = filtrados.filter(r => esIncapacidad(r.tipo));
+
+            const diasPermisos = permisos.reduce((acc, r) => acc + (Number(r.dias) || 0), 0);
+            const diasIncap = incapacidades.reduce((acc, r) => acc + (Number(r.dias) || 0), 0);
+
+            document.getElementById('kpi-total').textContent = filtrados.length;
+            document.getElementById('kpi-permisos').textContent = permisos.length;
+            document.getElementById('kpi-permisos-dias').textContent = `${diasPermisos} días acumulados`;
+            document.getElementById('kpi-incapacidades').textContent = incapacidades.length;
+            document.getElementById('kpi-incapacidades-dias').textContent = `${diasIncap} días acumulados`;
+            document.getElementById('kpi-empleados').textContent = empleados.length;
+        }
+
+        function renderizarBotonesMeses(filtrados) {
+            const container = document.getElementById('grid-botones-meses');
+            container.innerHTML = MESES_CORTOS.map((nombreMes, idx) => {
+                const totalMes = filtrados.filter(r => {
+                    const mes = parseInt(String(r.fecha_inicio).substring(5, 7), 10) - 1;
+                    return mes === idx;
+                }).length;
+
+                const badge = totalMes > 0
+                    ? `<span class="ml-1 px-1.5 py-0.5 rounded-full bg-purple-600 text-white text-[10px]">${totalMes}</span>`
+                    : '';
+
+                return `
+                    <button type="button" onclick="abrirModalCalendario(${idx})"
+                        class="py-2 px-2.5 rounded-xl border border-purple-200 bg-purple-50/60 hover:bg-purple-600 hover:text-white hover:border-purple-600 text-purple-900 text-xs font-bold transition flex items-center justify-center">
+                        <span>${nombreMes}</span>${badge}
+                    </button>
+                `;
+            }).join('');
+        }
+
+        function renderizarGraficos(filtrados) {
+            const datosPermisos = new Array(12).fill(0);
+            const datosIncap = new Array(12).fill(0);
+
+            filtrados.forEach(r => {
+                const mes = parseInt(String(r.fecha_inicio).substring(5, 7), 10) - 1;
+                if (mes >= 0 && mes < 12) {
+                    if (!esIncapacidad(r.tipo)) {
+                        datosPermisos[mes] += Number(r.dias) || 1;
+                    } else {
+                        datosIncap[mes] += Number(r.dias) || 1;
+                    }
+                }
+            });
+
+            const ctxBar = document.getElementById('grafico-mensual').getContext('2d');
+            if (chartMensual) chartMensual.destroy();
+
+            chartMensual = new Chart(ctxBar, {
+                type: 'bar',
+                data: {
+                    labels: MESES_CORTOS,
+                    datasets: [
+                        {
+                            label: 'Permisos (días)',
+                            data: datosPermisos,
+                            backgroundColor: '#7c3aed',
+                            borderRadius: 6
+                        },
+                        {
+                            label: 'Incapacidades (días)',
+                            data: datosIncap,
+                            backgroundColor: '#f43f5e',
+                            borderRadius: 6
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    onClick: (_, elements) => {
+                        if (elements && elements.length > 0) {
+                            abrirModalCalendario(elements[0].index);
+                        }
+                    },
+                    plugins: {
+                        legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } }
+                    },
+                    scales: {
+                        y: { beginAtZero: true, ticks: { stepSize: 1 } }
+                    }
+                }
+            });
+
+            const totalPermisos = datosPermisos.reduce((a, b) => a + b, 0);
+            const totalIncap = datosIncap.reduce((a, b) => a + b, 0);
+
+            const ctxDona = document.getElementById('grafico-dona').getContext('2d');
+            if (chartDona) chartDona.destroy();
+
+            chartDona = new Chart(ctxDona, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Permisos', 'Incapacidades'],
+                    datasets: [{
+                        data: (totalPermisos === 0 && totalIncap === 0) ? [1, 0] : [totalPermisos, totalIncap],
+                        backgroundColor: (totalPermisos === 0 && totalIncap === 0) ? ['#ede9fe', '#ede9fe'] : ['#7c3aed', '#f43f5e'],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    cutout: '68%',
+                    plugins: {
+                        legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } }
+                    }
+                }
+            });
+        }
+
+        function renderizarTabla() {
+            const tbody = document.getElementById('tbody-ausencias');
+            const texto = document.getElementById('busqueda-tabla').value.trim().toLowerCase();
+            const tipoFiltro = document.getElementById('filtro-tipo-tabla').value;
+
+            const lista = registros.filter(r => {
+                const nombreEmp = obtenerNombreEmpleado(r.empleado_id).toLowerCase();
+                const obs = (r.observacion || '').toLowerCase();
+                const tipoTxt = (r.tipo || '').toLowerCase();
+                const coincideTexto = !texto || nombreEmp.includes(texto) || obs.includes(texto) || tipoTxt.includes(texto);
+
+                let coincideTipo = true;
+                if (tipoFiltro === 'SOLO_PERMISOS') {
+                    coincideTipo = !esIncapacidad(r.tipo);
+                } else if (tipoFiltro !== 'TODOS') {
+                    coincideTipo = r.tipo === tipoFiltro;
+                }
+                return coincideTexto && coincideTipo;
+            });
+
+            if (lista.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="7" class="py-8 text-center text-xs text-slate-400 font-medium">
+                            No hay registros que coincidan con los filtros actuales.
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
+            tbody.innerHTML = lista.map(r => {
+                const nombreEmp = obtenerNombreEmpleado(r.empleado_id);
+                const badgeTipo = !esIncapacidad(r.tipo)
+                    ? `<span class="inline-block px-2.5 py-1 rounded-full bg-purple-100 text-purple-800 text-xs font-bold">${escaparHTML(r.tipo)}</span>`
+                    : `<span class="inline-block px-2.5 py-1 rounded-full bg-rose-100 text-rose-700 text-xs font-bold">${escaparHTML(r.tipo)}</span>`;
+
+                const rangoFechas = r.fecha_inicio === r.fecha_fin
+                    ? formatearFecha(r.fecha_inicio)
+                    : `${formatearFecha(r.fecha_inicio)} - ${formatearFecha(r.fecha_fin)}`;
+
+                const reposicion = r.fecha_reposicion
+                    ? `<span class="px-2 py-0.5 rounded-lg bg-emerald-100 text-emerald-800 text-xs font-bold">${formatearFecha(r.fecha_reposicion)}</span>`
+                    : '<span class="text-xs text-slate-400">—</span>';
+
+                return `
+                    <tr class="hover:bg-purple-50/40 transition">
+                        <td class="py-3 px-4 font-bold text-slate-800">${escaparHTML(nombreEmp)}</td>
+                        <td class="py-3 px-4">${badgeTipo}</td>
+                        <td class="py-3 px-4 text-xs font-medium text-slate-600 whitespace-nowrap">${rangoFechas}</td>
+                        <td class="py-3 px-4 font-extrabold text-purple-700">${r.dias}</td>
+                        <td class="py-3 px-4 whitespace-nowrap">${reposicion}</td>
+                        <td class="py-3 px-4 text-xs text-slate-500 max-w-xs truncate">${escaparHTML(r.observacion || 'Sin observación')}</td>
+                        <td class="py-3 px-4 text-right">
+                            <div class="inline-flex items-center gap-1">
+                                <button type="button" onclick="abrirModalEditarAusencia(${r.id})" title="Editar registro"
+                                    class="p-1.5 rounded-lg text-purple-600 hover:bg-purple-100 transition">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10"/>
+                                    </svg>
+                                </button>
+                                <button type="button" onclick="eliminarAusencia(${r.id})" title="Eliminar registro"
+                                    class="p-1.5 rounded-lg text-rose-500 hover:bg-rose-50 transition">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"/>
+                                    </svg>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        function actualizarDashboard() {
+            actualizarSelectsEmpleados();
+            const filtrados = obtenerRegistrosFiltradosGrafico();
+            actualizarKPIs(filtrados);
+            renderizarBotonesMeses(filtrados);
+            renderizarGraficos(filtrados);
+            renderizarTabla();
+        }
+
+        // =========================================================================
+        // 7. CALENDARIO INTERACTIVO MENSUAL
+        // =========================================================================
+        function abrirModalCalendario(mesIndex) {
+            const anio = Number(document.getElementById('filtro-anio').value || new Date().getFullYear());
+            const empFiltro = document.getElementById('filtro-empleado-grafico').value;
+
+            document.getElementById('modal-cal-titulo').textContent = `${MESES_LARGOS[mesIndex]} ${anio}`;
+            document.getElementById('modal-cal-subtitulo').textContent = empFiltro === 'TODOS'
+                ? 'Mostrando todos los empleados'
+                : `Empleado: ${obtenerNombreEmpleado(empFiltro)}`;
+
+            const primerDiaSemana = new Date(anio, mesIndex, 1).getDay();
+            const totalDiasMes = new Date(anio, mesIndex + 1, 0).getDate();
+            const grid = document.getElementById('grid-dias-calendario');
+
+            let htmlCeldas = '';
+            for (let i = 0; i < primerDiaSemana; i++) {
+                htmlCeldas += '<div class="min-h-[84px] rounded-xl bg-slate-50/70 border border-slate-100"></div>';
+            }
+
+            const registrosAplicables = registros.filter(r =>
+                empFiltro === 'TODOS' || Number(r.empleado_id) === Number(empFiltro)
+            );
+
+            for (let dia = 1; dia <= totalDiasMes; dia++) {
+                const fechaISO = `${anio}-${String(mesIndex + 1).padStart(2, '0')}-${String(dia).padStart(2, '0')}`;
+                let eventosHTML = '';
+
+                registrosAplicables.forEach(r => {
+                    const nombreCompleto = obtenerNombreEmpleado(r.empleado_id);
+                    const nombreCorto = escaparHTML(nombreCompleto.split(' ')[0]);
+                    if (fechaISO >= r.fecha_inicio && fechaISO <= r.fecha_fin) {
+                        if (!esIncapacidad(r.tipo)) {
+                            eventosHTML += `<div class="px-1.5 py-0.5 rounded bg-purple-600 text-white text-[10px] font-bold truncate" title="${escaparHTML(r.tipo)}: ${escaparHTML(nombreCompleto)}">${nombreCorto} (${escaparHTML(r.tipo)})</div>`;
+                        } else {
+                            eventosHTML += `<div class="px-1.5 py-0.5 rounded bg-rose-500 text-white text-[10px] font-bold truncate" title="Incapacidad: ${escaparHTML(nombreCompleto)}">${nombreCorto} (Incap.)</div>`;
+                        }
+                    }
+                    if (r.fecha_reposicion && r.fecha_reposicion === fechaISO) {
+                        eventosHTML += `<div class="px-1.5 py-0.5 rounded bg-emerald-500 text-white text-[10px] font-bold truncate" title="Repone permiso: ${escaparHTML(nombreCompleto)}">Repone: ${nombreCorto}</div>`;
+                    }
+                });
+
+                htmlCeldas += `
+                    <div class="min-h-[84px] p-1.5 rounded-xl border border-purple-100 bg-white flex flex-col gap-1">
+                        <span class="text-xs font-extrabold text-slate-700">${dia}</span>
+                        <div class="space-y-1 overflow-y-auto max-h-16">${eventosHTML}</div>
+                    </div>
+                `;
+            }
+
+            grid.innerHTML = htmlCeldas;
+            document.getElementById('modal-calendario').classList.remove('hidden');
+        }
+
+        function cerrarModalCalendario() {
+            document.getElementById('modal-calendario').classList.add('hidden');
+        }
+
+        // =========================================================================
+        // 8. INICIALIZACIÓN AL CARGAR LA PÁGINA
+        // =========================================================================
+        window.addEventListener('DOMContentLoaded', async () => {
+            inicializarClienteSupabase();
+
+            if (!supabaseConfigurado) {
+                document.getElementById('aviso-config-supabase').classList.remove('hidden');
+                return;
+            }
+
+            const sesionGuardada = localStorage.getItem('ausencias_usuario') || sessionStorage.getItem('ausencias_usuario');
+            if (sesionGuardada) {
+                await mostrarAplicacion(sesionGuardada);
+            }
+        });
+    </script>
+</body>
+</html>
