@@ -1410,7 +1410,7 @@ function evaluarAlertasIncapacidadesGlobales() {
                 const nombreEmp = obtenerNombreEmpleado(r.empleado_id);
                 const incapsVentana = obtenerIncapacidadesEnVentana4Meses(r.empleado_id);
                 const alertaFila = (esIncapacidad(r.tipo) && incapsVentana.length >= 2)
-                    ? `<span class="ml-1.5 px-2 py-0.5 rounded-full bg-rose-600 text-white text-[10px] font-extrabold" title="Excedió límite de incapacidades en los últimos 4 meses">¡Límite!</span>`
+                    ? `<span class="ml-1.5 px-2 py-0.5 rounded-full bg-rose-600 text-white text-[10px] font-extrabold" title="Excedió límite de incapacidades en los últimos 4 meses">Cambio de grupo</span>`
                     : '';
 
                 const badgeTipo = !esIncapacidad(r.tipo)
